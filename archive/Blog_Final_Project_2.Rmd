@@ -1,0 +1,368 @@
+---
+title: "The Geography of Global Trade: How Logistics Performance Shapes Economic Opportunity"
+author: "Gabriel Garcia"
+date: "December 1, 2025"
+output: 
+  html_document:
+    self_contained: true
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+```{r setup, include=FALSE}
+library(knitr)
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  fig.align = "center"
+)
+```
+
+```{r global_setup, echo=FALSE}
+library(readxl)
+library(dplyr)
+library(purrr)
+library(janitor)
+library(countrycode)
+library(tidyr)
+library(ggplot2)
+library(shiny)
+library(gganimate)
+library(plotly)
+
+file_path <- "C:\\Users\\12022\\Downloads\\Blog Project\\International_LPI_from_2007_to_2023_0 (1).xlsx"
+
+component_cols <- c(
+  "customs_score", 
+  "infrastructure_score", 
+  "international_shipments_score", 
+  "logistics_competence_and_quality_score", 
+  "timeliness_score", 
+  "tracking_and_tracing_score"
+)
+
+component_labels <- c(
+  customs_score = "Customs",
+  infrastructure_score = "Infrastructure",
+  international_shipments_score = "Intl Shipments",
+  logistics_competence_and_quality_score = "Logistics Quality",
+  timeliness_score = "Timeliness",
+  tracking_and_tracing_score = "Tracking"
+)
+
+component_palette <- c(
+  "Customs" = "#8B0000",           
+  "Infrastructure" = "#00008B",    
+  "Intl Shipments" = "#228B22",   
+  "Logistics Quality" = "#FF8C00", 
+  "Timeliness" = "#FF4500",      
+  "Tracking" = "#C71585"          
+)
+
+region_palette <- c(
+  "Africa" = "#9370DB",      
+  "Americas" = "#4682B4", 
+  "Asia" = "#2F4F2F",        
+  "Europe" = "#DAA520",      
+  "Oceania" = "#8B4513"      
+)
+
+primary_color <- "#4682B4"
+
+manual_regions <- c(
+  "Hong Kong SAR, China" = "Asia",
+  "Taiwan, China" = "Asia",
+  "Korea, Rep." = "Asia",
+  "Korea, Dem. Rep." = "Asia",
+  "Congo, Dem. Rep." = "Africa",
+  "Congo, Rep." = "Africa",
+  "Egypt, Arab Rep." = "Africa",
+  "Iran, Islamic Rep." = "Asia",
+  "Russian Federation" = "Europe"
+)
+
+custom_theme <- theme_minimal(base_size = 13, base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0, margin = margin(b = 10)),
+    plot.subtitle = element_text(size = 12, color = "gray30", hjust = 0, margin = margin(b = 15)),
+    plot.caption = element_text(size = 9, color = "gray50", hjust = 1, margin = margin(t = 10)),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 11),
+    legend.title = element_text(size = 11, face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray90"),
+    plot.margin = margin(15, 15, 15, 15)
+  )
+
+theme_set(custom_theme)
+```
+
+```{r dataload, echo=FALSE}
+sheets <- excel_sheets(file_path)
+
+dataLPI_all <- map_dfr(sheets, function(sh) {
+  read_excel(file_path, sheet = sh) %>%
+    clean_names() %>%
+    mutate(year = as.integer(sh))
+})
+```
+```{r region_creation, echo=FALSE}
+dataLPI_all <- dataLPI_all %>%
+  mutate(
+    region = if_else(
+      country %in% names(manual_regions), 
+      manual_regions[country],
+      countrycode(country, origin = "country.name", destination = "continent")
+    )
+  ) %>%
+  filter(!is.na(region))
+```
+
+---
+
+## Introduction
+
+My project looks at how well countries move goods across borders using the World Bank Logistics Performance Index. The index scores countries from one to five on customs, infrastructure, shipment ease, logistics competence, tracking, and timeliness. Since supply chains decide who can compete in the global economy, these scores line up with growth and trade.
+
+I used data from 2007 to 2023 for 139 countries to see whether logistics performance is becoming more equal or if the gap between strong and weak countries is getting wider. I made eight visualizations to follow the trends. There is real improvement in things like tracking technology and infrastructure, but landlocked and conflict heavy countries are still stuck behind. The goal is to show both the progress and the barriers that still shape global trade.
+
+---
+
+## A Global Logistics Divide: The 2023 Snapshot
+
+The journey begins with a simple question: how do countries compare today? The distribution below revealed a logistics hierarchy with profound implications.
+```{r visualization_1, echo=FALSE, fig.cap="Most nations cluster in the 2.5–3.5 range, but the tails tell competing stories: wealthy trade hubs on the right, struggling clacleconomies on the left."}
+dataLPI_2023 <- dataLPI_all %>% filter(year == 2023)
+
+ggplot(dataLPI_2023, aes(x = lpi_score)) +
+  geom_histogram(binwidth = 0.2, fill = primary_color, color = "white", alpha = 0.85) +
+  labs(
+    title = "The Global Logistics Middle Class (2023)",
+    subtitle = "Most countries score between 2.5–3.5, revealing a performance plateau",
+    x = "LPI Score (1–5 scale)",
+    y = "Number of Countries",
+    caption = "Source: World Bank Logistics Performance Index, 2023 | Higher scores indicate better logistics performance"
+  )
+```
+
+To start, I looked at the simple question of how countries compare in the most recent year. The 2023 distribution shows that most countries fall between two point five and three point five. It forms a clear middle range, which suggests that a basic level of logistics capability is within reach for many countries. The inequality shows up at the edges. Very few countries score above four, and these are places like Singapore, the Netherlands, and parts of Europe where logistics is a national priority. On the low end are countries that are landlocked, facing conflict, or struggling with weak institutions.
+
+For the visualization, I used a histogram with equal sized bins and a neutral color palette to keep the focus on the shape of the distribution. The goal is simply to show that logistics performance sits on a spectrum, and most of the world is clustered in the middle.
+
+---
+
+## Regional Divergence Over Time: Who's Rising, Who's Stuck?
+
+Aggregate distributions hide temporal trends. To understand change, we  track regions across the full 16-year dataset. The interactive chart below invites exploration.
+```{r visualization_2_plotly, echo=FALSE, fig.cap="Interactive exploration reveals Europe's dominance, Asia's rise, and Africa's stagnation. Hover over data points to see exact scores."}
+avgLPI_by_region <- dataLPI_all %>%
+  group_by(year, region) %>%
+  summarise(avg_lpi = mean(lpi_score, na.rm = TRUE), .groups = "drop")
+
+p_plotly <- plot_ly(avgLPI_by_region, 
+                    x = ~year, 
+                    y = ~avg_lpi, 
+                    color = ~region,
+                    colors = region_palette,
+                    type = 'scatter',
+                    mode = 'lines+markers',
+                    text = ~paste("Region:", region, 
+                                  "<br>Year:", year,
+                                  "<br>LPI Score:", round(avg_lpi, 2)),
+                    hoverinfo = 'text',
+                    line = list(width = 3),
+                    marker = list(size = 8)) %>%
+  layout(title = list(text = "Regional Logistics Trajectories (2007–2023)<br><sub>Europe leads, Asia climbs, Africa flatlines</sub>", 
+                      font = list(size = 16)),
+         xaxis = list(title = "Year", gridcolor = "lightgray"),
+         yaxis = list(title = "Average LPI Score", gridcolor = "lightgray"),
+         hovermode = "closest",
+         plot_bgcolor = "white",
+         paper_bgcolor = "white")
+
+p_plotly
+```
+
+The next visualization looks at how each region performs across the full period. Europe stays far ahead, consistently scoring above three point five. It reflects how much the European Union has invested in cross border infrastructure and customs systems. Asia shows the strongest climb after 2014, which lines up with the rise of manufacturing powerhouses like China, Vietnam, and India as they modernized ports and digitized their supply chains. The Americas sit in the middle range, and Australia and New Zealand track close to them. The most worrying pattern is Africa, which stays almost flat between about 2.4 and 2.6 with no real progress.
+
+For this chart, I used Plotly so users can hover and explore individual year and region values without crowding the figure with labels. Each region keeps a consistent color, which makes the lines easier to follow. The interactivity helps turn a simple line chart into something people can actually explore.
+
+---
+
+## Deconstructing the Index: Which Components Drive Improvement?
+
+Regional averages hide internal structure. The LPI aggregates six sub-scores, each represents a different dimension of logistics performance. By tracking these components separately, we can diagnose where improvement happens and where it doesn't.
+```{r visualization_3, echo=FALSE, fig.cap="Infrastructure and tracking surge ahead, while customs improvement lags—revealing that technology outpaces bureaucracy."}
+avg_components <- dataLPI_all %>%
+  group_by(year) %>%
+  summarise(across(all_of(component_cols), ~mean(., na.rm = TRUE)), .groups = "drop") %>%
+  pivot_longer(-year, names_to = "component", values_to = "avg_score") %>%
+  mutate(component = recode(component, !!!component_labels))
+
+ggplot(avg_components, aes(x = year, y = avg_score, color = component)) +
+  geom_line(linewidth = 1.4, alpha = 0.9) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  scale_color_manual(values = component_palette) +
+  labs(
+    title = "Global Logistics Components: Technology Leads, Bureaucracy Lags",
+    subtitle = "Infrastructure and tracking improve fastest; customs reform stalls globally (2007–2023)",
+    x = "Year",
+    y = "Average Component Score (1–5 scale)",
+    color = "Component",
+    caption = "Source: World Bank LPI | Each line represents the global average for one of six logistics dimensions"
+  ) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+```
+
+This chart looks at how each part of the LPI has changed over time. Timeliness has the highest overall score, which makes sense since the world has continued to get faster at delivery. Infrastructure and logistics quality show the steepest improvement, reflecting major global investment in ports, highways, and new supply chain technology like real time tracking. On the other end, customs barely moves at all, growing less than three percent across the whole period. That suggests that while money can quickly upgrade physical infrastructure, the actual processes and bureaucracy behind borders are much harder to fix.
+
+The visualization uses a multivariate line chart with a colorblind friendly palette so it is easy to track each component. Everything is kept on the same scale so the comparisons are direct. The points highlight the survey years since the LPI is not collected every year and the data is discrete.
+
+---
+
+## From Trends to Magnitudes: Ranking Component Growth
+
+While line charts excel at showing change over time, bar charts excel at showing relative magnitude. To show which components have grown most, we calculate percent change from 2007 to 2023 and rank them.
+```{r visualization_4, echo=FALSE, fig.cap="Tracking outpaces all other dimensions, growing 12%, while customs barely budges at 3%—a bureaucratic bottleneck."}
+growth <- avg_components %>%
+  group_by(component) %>%
+  summarise(
+    start_2007 = avg_score[year == 2007],
+    end_2023 = avg_score[year == 2023],
+    growth_pct = (end_2023 - start_2007) / start_2007 * 100,
+    .groups = "drop"
+  )
+
+ggplot(growth, aes(x = reorder(component, growth_pct), y = growth_pct, fill = component)) +
+  geom_col(width = 0.7, alpha = 0.9) +
+  geom_text(aes(label = paste0(round(growth_pct, 1), "%")), 
+            hjust = -0.1, size = 4.5, fontface = "bold", color = "gray20") +
+  coord_flip() +
+  scale_fill_manual(values = component_palette) +
+  labs(
+    title = "Tracking Technology Surges, Customs Reform Crawls",
+    subtitle = "Percent growth in global logistics components (2007–2023)",
+    x = NULL,
+    y = "Growth (%)",
+    caption = "Source: World Bank LPI | Bars ordered by magnitude for immediate comparison"
+  ) +
+  theme(legend.position = "none") +
+  expand_limits(y = max(growth$growth_pct) * 1.15)
+```
+
+This chart focuses on how much each LPI component has grown since the start of the dataset. Infrastructure shows the biggest increase at about twelve point eight percent, which lines up with major global spending on ports, roads, and supply chain systems. Tracking also grows a lot, driven by things like GPS, better container tech, and the consumer expectation of real time updates from companies like Amazon and FedEx. Timeliness barely increases, which suggests that faster infrastructure does not automatically translate into faster processing. It may take more time before the effects show up. Overall, the pattern fits the idea that technology is easy to scale but actual institutional reform is much slower.
+The bar chart uses a zero to fifteen percent scale and orders the components from highest growth to lowest, which makes it easier to read and differentiate than a pie chart. The colors simply separate the components so the ranking is immediately clear.
+---
+
+## Interactive Leaderboards: Regional Champions and Challengers
+
+Aggregates obscure individual stories. To understand who leads each region-and how leadership shifts over time-we need granular, country-level rankings. The interactive tool below lets you explore regional leaderboards across survey years.
+
+https://ggarcia-stats.shinyapps.io/lpi_leaderboard/
+
+The interactive leaderboard shows differences that do not show up in the overall averages. In Europe, the top performers are almost always Northern and Western countries like Germany, the Netherlands, Belgium, Austria, and Sweden. Asia’s leaders shift between places like Singapore, Hong Kong, Japan, and South Korea, which highlights the mix of trade hubs and large manufacturing economies. In Africa, South Africa and a few North African countries usually lead, while most of sub Saharan Africa is missing from the top spots. In the Americas, Chile and Panama often rise, while bigger economies, including Brazil, move up and down more often.
+
+The animation helps turn the rankings into a story, letting viewers watch how positions change over time. The horizontal bars stay ordered by score, and the labels are direct, so it is easy to compare countries across years. The region filter and the year slider make it simple to explore different patterns without adding a lot of clutter.
+
+
+---
+
+## Country-Level Deep Dive: Benchmarking Against Regional Peers
+
+Regional rankings answer "who's best?", but policymakers need a different question: "How does my country compare to neighbors on specific dimensions?" The tool below allows sub component-level benchmarking.
+
+https://ggarcia-stats.shinyapps.io/app2/
+
+This comparison moves the story from broad regional patterns to what is actually happening within those regions. When you stack individual countries against their own regional average, you start to see who is breaking away from the pack and who is dragging behind. Rwanda is a good example of upward movement within Africa, with infrastructure growth far above the regional baseline. Vietnam shows a similar breakout in Asia with rapid gains in tracking and logistics tech. On the other side, Venezuela falls sharply below the Americas average, showing how national crises pull logistics performance downward even when the region as a whole is improving.
+
+This matters because it shows that regional trends do not tell the full story. Progress is uneven, and the gap between leaders and laggards exists not only across regions but inside them. The visualization lets viewers pull up the regional average only when they want it, so the main focus stays on the country’s trajectory. 
+
+Using lighter opacity for the regional line keeps the comparison clear while keeping the attention on the country itself. The consistent color scheme links back to the earlier visuals so everything feels part of a single narrative.
+
+---
+
+## Motion Reveals Pattern: Infrastructure as the Engine of Performance
+
+Static charts show what and how much; animation shows when. To understand the relationship between infrastructure investment and overall LPI performance over time, we animate a scatterplot across 16 years.
+```{r animation_creation, include=FALSE, echo=FALSE, message=FALSE, results='hide'}
+animated <- dataLPI_all %>%
+  select(country, region, year, lpi_score, infrastructure_score)
+
+p <- ggplot(animated, aes(x = infrastructure_score, 
+                          y = lpi_score, 
+                          color = region)) +
+  geom_point(size = 3, alpha = 0.75) +
+  scale_color_manual(values = region_palette) +
+  labs(
+    title = "Infrastructure Drives Logistics Performance (2007–2023)",
+    subtitle = "Year: {frame_time}",
+    x = "Infrastructure Score (1–5 scale)",
+    y = "Overall LPI Score (1–5 scale)",
+    color = "Region",
+    caption = "Source: World Bank LPI | Each point represents one country; color indicates region"
+  ) +
+  theme(legend.position = "right") +
+  transition_time(year) +
+  ease_aes('linear')
+
+anim <- animate(
+  p, width = 8, height = 6,
+  fps = 10, nframes = 150,
+  renderer = gifski_renderer()
+)
+```
+
+```{r animate_graphic, echo=FALSE}
+knitr::include_graphics("animation.gif")
+```
+
+
+When you animate the scatterplot over time, a clear pattern shows up. Countries with stronger infrastructure almost always have higher LPI scores, and the two move together year after year. Asian countries steadily climb upward on both axes as ports, highways, and supply chain tech expand across the region. Africa stays clustered in the lower left with only small shifts, which highlights how weak infrastructure can keep nations stuck. Europe remains grouped in the upper right, showing high performance and slow, steady improvement.correlation. Asian nations (dark green) visibly climb the scatterplot over time, reflecting China's Belt and Road Initiative, Vietnam's port expansions, and India's Golden Quadrilateral highway project. African nations (purple) remain clustered in the lower-left quadrant, with minimal upward movement—illustrating how lack of infrastructure investment creates a development trap. European nations (gold) remain tightly grouped in the upper-right, showing that mature economies maintain high performance with incremental improvements.
+
+The animation makes these movements easy to see because the motion shows how countries drift or stay locked in place over time. Color separates the regions, and the smooth transitions make the story feel continuous rather than choppy. Instead of a static picture, you get to watch the global gap widen or narrow—bringing the convergence question into focus.
+
+---
+
+## Geography is Destiny: A Spatial View of Logistics Performance
+
+Numbers and charts reveal patterns; maps reveal place. To understand the geographic dimension of logistics performance—why coastal nations, trade route hubs, and landlocked countries cluster where they do—we turn to a choropleth map created in Tableau.
+```{r tableau_screenshot, echo=FALSE, out.width="100%", fig.cap="Coastal nations and trade route hubs (Singapore, Netherlands, UAE) glow bright on this global map, while landlocked and conflict-affected regions remain dark—logistics performance has a geography."}
+knitr::include_graphics("C:\\Users\\12022\\Documents\\LPI Mapping.png")
+```
+
+The map makes something obvious that the summary charts do not: logistics performance follows geography. The strongest scores cluster around the world’s major shipping lanes, like the North Sea, the Malacca Strait, and the Persian Gulf. Countries that are landlocked, such as Bolivia, Chad, the Central African Republic, and Afghanistan, show much lower scores. Conflict zones like Syria, Yemen, and South Sudan also appear in the lowest range, where damaged roads, closed borders, and weak institutions hold everything back.
+
+Seeing the data on a map helps explain why these patterns exist. High scoring countries tend to sit on coastlines or major trade routes, and large parts of sub Saharan Africa appear much lighter, showing how distance and limited infrastructure create real barriers. The Tableau map uses a simple light to dark color scale so the magnitude is easy to read, and keeping the familiar country borders makes the patterns easier to recognize.
+
+---
+
+## Conclusion: Technology Accelerates, Geography Constrains, Bureaucracy Stalls
+
+Looking across all eight visuals, the main idea is straightforward: some countries are set up to succeed in logistics, some are improving, and others are stuck for reasons they can’t fix quickly.
+
+A few patterns show up again and again. First, the differences between countries make sense. Places on the coast or with strong trade networks usually score higher, while landlocked or conflict-affected countries fall behind. Second, not everything improves at the same speed. Infrastructure and tracking get better because technology helps, but customs barely changes since government processes move slowly. Third, the gap between regions isn’t closing. Asia is catching up to Europe, but Africa isn’t catching up much at all.
+
+For policymakers, the message is simple: improving logistics isn’t only about building new roads or ports. Countries also need faster customs, more transparency, and less delay. For the project overall, using different types of visuals—static, interactive, and animated—helped make the story clearer.
+
+There are limits to the data. The LPI uses surveys, it averages across whole countries, and it only covers sixteen years. It can’t show what’s happening inside each country or how things might change in the future.
+
+Still, the big takeaway is clear: logistics performance matters, and the differences we see between countries affect everything from trade to everyday shipments. This project doesn’t answer everything, but it shows why logistics is worth paying attention to.
+
+
+## Accessibility Statement
+
+I designed the report so that the visuals are easy to read and accessible to as many users as possible. The color palettes were checked with a color blindness simulator to make sure the regions and components stay clear for different types of color vision. Text sizes are kept large enough for comfortable reading, with bigger titles and slightly smaller axis labels. Each figure includes a caption that explains the main takeaway, which works as an alt text equivalent for anyone who can’t see the graphic clearly. The Shiny apps include short help notes and follow a logical order so they can be navigated by keyboard. The white background and dark gray text create strong contrast, making the visuals clean and readable.
+
+---
+
+## Data Source
+
+World Bank. (2023). *Logistics Performance Index (LPI)*. Retrieved from https://lpi.worldbank.org/
+
+---
