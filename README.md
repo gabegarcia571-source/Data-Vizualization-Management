@@ -13,9 +13,9 @@ Explore the findings through four interactive Shiny applications:
 | Application | Focus | Link |
 |------------|-------|------|
 | **Passport Power Dashboard** | Multi-tab analysis of visa-free access trends, leaderboards, and power shifts | [Launch App](https://ggarcia-stats.shinyapps.io/passport-power-analytics/) |
-| **Regional LPI Leaderboard** | Track logistics performance leaders over time with animated year slider | [Launch App](https://ggarcia-stats.shinyapps.io/regional-lpi-leaderboard/) |
-| **LPI Growth Explorer** | Compare two countries' logistics performance trajectories (2007-2023) | [Launch App](https://ggarcia-stats.shinyapps.io/lpi-growth-explorer/) |
-| **Component Benchmarking** | Country vs. regional component-level growth analysis | [Launch App](https://ggarcia-stats.shinyapps.io/lpi-component-benchmark/) |
+| **Regional LPI Leaderboard** | Track logistics performance leaders over time with animated year slider | [Launch App](https://ggarcia-stats.shinyapps.io/lpi_leaderboard/) |
+| **LPI Growth Explorer** | Compare two countries' logistics performance trajectories (2007-2023) | [Launch App](https://ggarcia-stats.shinyapps.io/LPI_Growth_Explorer/) |
+| **Component Benchmarking** | Country vs. regional component-level growth analysis | [Launch App](https://ggarcia-stats.shinyapps.io/app2/) |
 
 ---
 
