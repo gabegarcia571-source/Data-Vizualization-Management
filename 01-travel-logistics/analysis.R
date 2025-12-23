@@ -1,0 +1,474 @@
+#===============================================================================
+# SCRIPT: analysis.R
+# TITLE: Travel & Logistics Analysis (World Bank LPI 2007–2023)
+# PURPOSE: Reproduce the author’s full LPI import, cleaning, visualization, Shiny tools, and animation workflow.
+# AUTHOR: Gabriel Garcia
+# DATE: 2025-12-22
+# DEPENDENCIES: (see library() calls below; preserved from source)
+#
+# IMPORTANT:
+# - Code blocks below are extracted verbatim from the original .Rmd source.
+# - Only comments/section headers were added for readability; logic is unchanged.
+# - Hard-coded paths (if any) are preserved exactly as written in the source.
+#===============================================================================
+
+#===============================================================================
+# CHUNK 1: setup
+# RMD HEADER: {setup, include=FALSE}
+#===============================================================================
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  fig.align = "center"
+)
+
+
+#===============================================================================
+# CHUNK 2: global_setup
+# RMD HEADER: {global_setup, echo=FALSE}
+#===============================================================================
+# This chunk sets options for all the code chunks and hides the codes and warnings. It also controls defualt plot size.
+
+# NOTE: The Windows path below is preserved exactly from the author’s source.
+#       Update file_path to your local environment for portability if needed.
+library(readxl)
+library(dplyr)
+library(purrr)
+library(janitor)
+library(countrycode)
+library(tidyr)
+library(ggplot2)
+library(shiny)
+library(gganimate)
+library(plotly)
+
+file_path <- "C:/Users/12022/Downloads/International_LPI_from_2007_to_2023_0 (1).xlsx"
+
+component_cols <- c(
+  "customs_score", 
+  "infrastructure_score", 
+  "international_shipments_score", 
+  "logistics_competence_and_quality_score", 
+  "timeliness_score", 
+  "tracking_and_tracing_score"
+)
+
+component_labels <- c(
+  customs_score = "Customs",
+  infrastructure_score = "Infrastructure",
+  international_shipments_score = "Intl Shipments",
+  logistics_competence_and_quality_score = "Logistics Quality",
+  timeliness_score = "Timeliness",
+  tracking_and_tracing_score = "Tracking"
+)
+
+component_palette <- c(
+  "Customs" = "#8B0000",           
+  "Infrastructure" = "#00008B",    
+  "Intl Shipments" = "#228B22",   
+  "Logistics Quality" = "#FF8C00", 
+  "Timeliness" = "#FF4500",      
+  "Tracking" = "#C71585"          
+)
+
+region_palette <- c(
+  "Africa" = "#9370DB",      
+  "Americas" = "#4682B4", 
+  "Asia" = "#2F4F2F",        
+  "Europe" = "#DAA520",      
+  "Oceania" = "#8B4513"      
+)
+
+primary_color <- "#4682B4"
+
+manual_regions <- c(
+  "Hong Kong SAR, China" = "Asia",
+  "Taiwan, China" = "Asia",
+  "Korea, Rep." = "Asia",
+  "Korea, Dem. Rep." = "Asia",
+  "Congo, Dem. Rep." = "Africa",
+  "Congo, Rep." = "Africa",
+  "Egypt, Arab Rep." = "Africa",
+  "Iran, Islamic Rep." = "Asia",
+  "Russian Federation" = "Europe"
+)
+
+custom_theme <- theme_minimal(base_size = 13, base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0, margin = margin(b = 10)),
+    plot.subtitle = element_text(size = 12, color = "gray30", hjust = 0, margin = margin(b = 15)),
+    plot.caption = element_text(size = 9, color = "gray50", hjust = 1, margin = margin(t = 10)),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 11),
+    legend.title = element_text(size = 11, face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray90"),
+    plot.margin = margin(15, 15, 15, 15)
+  )
+
+theme_set(custom_theme)
+
+
+#===============================================================================
+# CHUNK 3: dataload
+# RMD HEADER: {dataload, echo=FALSE}
+#===============================================================================
+# This then generalizes the data being used and names the six LPI components in the dataset that I used. It has shorter nicer labels to show in the plots and colors for each region. The manual regions manually fixes for countries that mislabled. I forced specific countries into regions. The custom ggplot theme was made so all plots have the same consistent theme.
+
+sheets <- excel_sheets(file_path)
+
+dataLPI_all <- map_dfr(sheets, function(sh) {read_excel(file_path, sheet = sh) %>%
+    clean_names() %>%
+    mutate(year = as.integer(sh))
+})
+
+
+#===============================================================================
+# CHUNK 4: region_creation
+# RMD HEADER: {region_creation, echo=FALSE}
+#===============================================================================
+# Gets the names of all sheets in the excel file and reads them. Then it stacks them into one big data sheet. The mutate as integer allows us to attatch the year from each sheet and then mapdfr is how to combine all the sheets as rows.
+
+dataLPI_all <- dataLPI_all %>%
+  mutate(region = if_else(
+      country %in% names(manual_regions), 
+      manual_regions[country],
+      countrycode(country, origin = "country.name", destination = "continent")
+    )
+  ) %>%
+  filter(!is.na(region))
+
+
+#===============================================================================
+# CHUNK 5: visualization_1
+# RMD HEADER: {visualization_1, echo=FALSE, fig.cap="Most nations cluster in the 2.5–3.5 range, but the tails tell competing stories: wealthy trade hubs on the right, struggling economies on the left."}
+#===============================================================================
+# This creats the region variable for each country, so if the country is in my manual region list it uses that, otherwise it will use country code to map from country name to the region. It drops missing rows with the filter.
+
+dataLPI_2023 <- dataLPI_all %>% filter(year == 2023)
+
+ggplot(dataLPI_2023, aes(x = lpi_score)) +
+  geom_histogram(binwidth = 0.2, fill = primary_color, color = "white", alpha = 0.85) +
+  labs(
+    title = "The Global Logistics Middle Class (2023)",
+    subtitle = "Most countries score between 2.5–3.5, revealing a performance plateau",
+    x = "LPI Score (1–5 scale)",
+    y = "Number of Countries",
+    caption = "Source: World Bank Logistics Performance Index, 2023 | Higher scores indicate better logistics performance"
+  )
+
+
+#===============================================================================
+# CHUNK 6: visualization_2_plotly
+# RMD HEADER: {visualization_2_plotly, echo=FALSE, fig.cap="Interactive exploration reveals Europe's dominance, Asia's rise, and Africa's stagnation. Hover over data points to see exact scores."}
+#===============================================================================
+# Filter full dataset down to just 2023. Shows how many countries fall in each bin.
+
+avgLPI_by_region <- dataLPI_all %>%
+  group_by(year, region) %>%
+  summarise(avg_lpi = mean(lpi_score, na.rm = TRUE), .groups = "drop")
+
+p_plotly <- plot_ly(avgLPI_by_region, 
+                    x = ~year, 
+                    y = ~avg_lpi, 
+                    color = ~region,
+                    colors = region_palette,
+                    type = 'scatter',
+                    mode = 'lines+markers',
+                    text = ~paste("Region:", region, 
+                                  "<br>Year:", year,
+                                  "<br>LPI Score:", round(avg_lpi, 2)),
+                    hoverinfo = 'text',
+                    line = list(width = 3),
+                    marker = list(size = 8)) %>%
+  layout(title = list(text = "Regional Logistics Trajectories (2007–2023)<br><sub>Europe leads, Asia climbs, Africa flatlines</sub>", 
+                      font = list(size = 16)),
+         xaxis = list(title = "Year", gridcolor = "lightgray"),
+         yaxis = list(title = "Average LPI Score", gridcolor = "lightgray"),
+         hovermode = "closest",
+         plot_bgcolor = "white",
+         paper_bgcolor = "white")
+
+p_plotly
+
+
+#===============================================================================
+# CHUNK 7: visualization_3
+# RMD HEADER: {visualization_3, echo=FALSE, fig.cap="Infrastructure and tracking surge ahead, while customs improvement lags—revealing that technology outpaces bureaucracy."}
+#===============================================================================
+# This computes the average LPI score by region and year. Each line is a region, and you can hover to see exact values.The hover info set as text is used later in layout with sub commands to show the proper data pieces, pulling from the plot itself.
+
+avg_components <- dataLPI_all %>%
+  group_by(year) %>%
+  summarise(across(all_of(component_cols), ~mean(., na.rm = TRUE)), .groups = "drop") %>%
+  pivot_longer(-year, names_to = "component", values_to = "avg_score") %>%
+  mutate(component = recode(component, !!!component_labels))
+
+ggplot(avg_components, aes(x = year, y = avg_score, color = component)) +
+  geom_line(linewidth = 1.4, alpha = 0.9) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  scale_color_manual(values = component_palette) +
+  labs(
+    title = "Global Logistics Components: Technology Leads, Bureaucracy Lags",
+    subtitle = "Infrastructure and tracking improve fastest; customs reform stalls globally (2007–2023)",
+    x = "Year",
+    y = "Average Component Score (1–5 scale)",
+    color = "Component",
+    caption = "Source: World Bank LPI | Each line represents the global average for one of six logistics dimensions"
+  ) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3)))
+
+
+#===============================================================================
+# CHUNK 8: visualization_4
+# RMD HEADER: {visualization_4, echo=FALSE, fig.cap="Tracking outpaces all other dimensions, growing 12%, while customs barely budges at 3%—a bureaucratic bottleneck."}
+#===============================================================================
+# For each year, computes the global average of each component.This turns the data from wide format into long format with pivot longer then it replaces the long column name with the labels I created early on. The ggplot is a line graph that tracks growth.
+
+growth <- avg_components %>%
+  group_by(component) %>%
+  summarise(
+    start_2007 = avg_score[year == 2007],
+    end_2023 = avg_score[year == 2023],
+    growth_pct = (end_2023 - start_2007) / start_2007 * 100,
+    .groups = "drop"
+  )
+
+ggplot(growth, aes(x = reorder(component, growth_pct), y = growth_pct, fill = component)) +
+  geom_col(width = 0.7, alpha = 0.9) +
+  geom_text(aes(label = paste0(round(growth_pct, 1), "%")), 
+            hjust = -0.1, size = 4.5, fontface = "bold", color = "gray20") +
+  coord_flip() +
+  scale_fill_manual(values = component_palette) +
+  labs(
+    title = "Tracking Technology Surges, Customs Reform Crawls",
+    subtitle = "Percent growth in global logistics components (2007–2023)",
+    x = NULL,
+    y = "Growth (%)",
+    caption = "Source: World Bank LPI | Bars ordered by magnitude for immediate comparison"
+  ) +
+  theme(legend.position = "none") +
+  expand_limits(y = max(growth$growth_pct) * 1.15)
+
+
+#===============================================================================
+# CHUNK 9: visualization_5
+# RMD HEADER: {visualization_5, echo=FALSE}
+#===============================================================================
+# Each component has a function calculating its average score in 2007 and 2023 and then the percent growth between those years, specifically in the growth data tibble. Then, the ggplot creates the horizontal bar chart showing percentage growth in descending order.
+
+survey_years <- c(2007, 2010, 2012, 2014, 2016, 2018, 2023)
+
+ui <- fluidPage(
+  titlePanel("Regional LPI Leaderboard: Track Leaders Over Time"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("region", "Select Region:", 
+                  choices = sort(unique(dataLPI_all$region))),
+      selectInput("top_n", "Number of Countries to Display:",
+                  choices = c(3, 5, 7, 10),
+                  selected = 5),
+      sliderInput("year", "Select Year:", 
+                  min = min(survey_years),
+                  max = max(survey_years),
+                  value = max(survey_years),
+                  step = NULL,
+                  animate = animationOptions(interval = 1500, loop = TRUE),
+                  sep = ""),
+      hr(),
+      helpText("Use the play button to animate rankings over time. Different regions show different patterns of leadership stability.")
+    ),
+    mainPanel(
+      plotOutput("leaderboard", height = "550px")
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  observe({
+    updateSliderInput(session, "year",
+                      min = min(survey_years),
+                      max = max(survey_years),
+                      value = input$year,
+                      step = NULL)
+  })
+  
+  output$leaderboard <- renderPlot({
+    req(input$region, input$year)
+    
+    closest_year <- survey_years[which.min(abs(survey_years - input$year))]
+    
+    top_countries <- dataLPI_all %>%
+      filter(region == input$region, year == closest_year) %>%
+      arrange(desc(lpi_score)) %>%
+      head(as.numeric(input$top_n))
+    
+    ggplot(top_countries, aes(x = reorder(country, lpi_score), y = lpi_score)) +
+      geom_col(fill = primary_color, width = 0.7, alpha = 0.9) +
+      geom_text(aes(label = round(lpi_score, 2)), 
+                hjust = -0.2, size = 5.5, fontface = "bold", color = "gray20") +
+      coord_flip() +
+      labs(
+        title = paste("Top", input$top_n, "Logistics Performers in", input$region),
+        subtitle = paste("Year:", closest_year, "| Scores range from 1 (worst) to 5 (best)"),
+        x = NULL,
+        y = "LPI Score",
+        caption = "Source: World Bank LPI | Countries ranked by overall logistics performance"
+      ) +
+      theme(
+        axis.text.y = element_text(size = 13, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold")
+      ) +
+      expand_limits(y = 5)
+  })
+}
+
+shinyApp(ui, server, options = list(height = 750))
+
+
+#===============================================================================
+# CHUNK 10: visualization_6
+# RMD HEADER: {visualization_6, echo=FALSE}
+#===============================================================================
+# The LPI survey is collected in specific years, so survey years defines those. Then the UI defines the shiny app interface for the regional leadership. The sidebar panel is how to select the region. The select input is the drop down that selects the number of coutreis to show. I used AI to create slider, which makes a play button for survey year under the animate options at selected intervals. The helpter text explains how to use the app. Plot output is the space where the bar chart appears.
+# The server function defines the leaderborad. The slider alighns with the survey years by observing the slider input from a previous step. The leaderport plot is manually rendered. Since there is a limited amount of observations, the closest year function allows me to find the closest survey year to the slider value and show that one. The data is then filtered for top countries and arranged descending. The plot shows the top N countries as a horizontal bar chart.
+
+ui <- fluidPage(
+  titlePanel("Country vs. Regional Benchmarking: Component-Level Growth"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("region2", "Select Region:", 
+                  choices = sort(unique(dataLPI_all$region))),
+      uiOutput("country_ui"),
+      checkboxInput("show_regional", "Overlay Regional Average"),
+      hr(),
+      helpText("Compare individual country growth rates to regional averages.")
+    ),
+    mainPanel(plotOutput("growth_plot", height = "550px"))
+  )
+)
+
+server <- function(input, output, session) {
+  output$country_ui <- renderUI({
+    countries <- dataLPI_all %>%
+      filter(region == input$region2) %>%
+      distinct(country) %>%
+      arrange(country) %>%
+      pull(country)
+    
+    selectInput("country", "Select Country:", choices = countries)
+  })
+  
+  output$growth_plot <- renderPlot({
+    req(input$country)
+    
+    country_data <- dataLPI_all %>%
+      filter(country == input$country) %>%
+      select(year, all_of(component_cols)) %>%
+      pivot_longer(cols = all_of(component_cols), 
+                   names_to = "component", values_to = "score") %>%
+      mutate(
+        component = recode(component, !!!component_labels),
+        type = "Country"
+      )
+    
+    if (input$show_regional) {
+      regional_data <- dataLPI_all %>%
+        filter(region == input$region2) %>%
+        select(year, all_of(component_cols)) %>%
+        pivot_longer(cols = all_of(component_cols), 
+                     names_to = "component", values_to = "score") %>%
+        group_by(component, year) %>%
+        summarise(score = mean(score, na.rm = TRUE), .groups = "drop") %>%
+        mutate(
+          component = recode(component, !!!component_labels),
+          type = "Regional Avg"
+        )
+      
+      plot_data <- bind_rows(country_data, regional_data)
+    } else {
+      plot_data <- country_data
+    }
+    
+    growth <- plot_data %>%
+      group_by(component, type) %>%
+      summarise(
+        start = score[which.min(year)],
+        end = score[which.max(year)],
+        growth_pct = (end - start) / start * 100,
+        .groups = "drop"
+      )
+    
+    ggplot(growth, aes(x = reorder(component, growth_pct), 
+                       y = growth_pct, fill = component)) +
+      geom_col(aes(alpha = type), position = position_dodge(width = 0.8), 
+               width = 0.7) +
+      coord_flip() +
+      scale_fill_manual(values = component_palette, guide = "none") +
+      scale_alpha_manual(values = c("Country" = 1, "Regional Avg" = 0.5), 
+                         name = "Comparison") +
+      labs(
+        title = paste(input$country, "vs.", input$region2, "Regional Average"),
+        subtitle = "Component-level growth rates (earliest to latest survey)",
+        x = NULL,
+        y = "Growth (%)",
+        caption = "Source: World Bank LPI | Toggle regional average to benchmark performance"
+      )
+})
+}
+shinyApp(ui, server, options = list(height = 750))
+
+
+#===============================================================================
+# CHUNK 11: animation_creation
+# RMD HEADER: {animation_creation, echo=FALSE, message=FALSE, results='hide'}
+#===============================================================================
+# This is a shiny app to compare country growth in logistics to the region. The sidebar creates the region from drop down. It defines the UI for the coutnry vs regional growth. Then it has the check box input to overlay regional bars on top. The server logic took the country drop down whenever the region changes and updates it for that new region. The plot growth in component scores for selected countries is in the render plot where all component scores for the given year are pulled. If the checkbox is on, it computes the regional averages for comparison instead of hardcoding. plot data bind rows combines the coutnry data and regional averages. Using this, we plot the growth as a horizontal bar chart between the earliest year and last year.
+
+animated <- dataLPI_all %>%
+  select(country, region, year, lpi_score, infrastructure_score)
+
+p <- ggplot(animated, aes(x = infrastructure_score, 
+                          y = lpi_score, 
+                          color = region)) +
+  geom_point(size = 3, alpha = 0.75) +
+  scale_color_manual(values = region_palette) +
+  labs(
+    title = "Infrastructure Drives Logistics Performance (2007–2023)",
+    subtitle = "Year: {frame_time}",
+    x = "Infrastructure Score (1–5 scale)",
+    y = "Overall LPI Score (1–5 scale)",
+    color = "Region",
+    caption = "Source: World Bank LPI | Each point represents one country; color indicates region"
+  ) +
+  theme(legend.position = "right") +
+  transition_time(year) +
+  ease_aes('linear')
+
+anim <- animate(
+  p, width = 8, height = 6,
+  fps = 10, nframes = 150,
+  renderer = gifski_renderer()
+)
+
+
+#===============================================================================
+# CHUNK 12: animate_graphic
+# RMD HEADER: {animate_graphic, echo=FALSE}
+#===============================================================================
+
+knitr::include_graphics("animation.gif")
+
+
+#===============================================================================
+# CHUNK 13: screenshot upload
+# RMD HEADER: {screenshot upload, out.width="20%"}
+#===============================================================================
+# this was an animated scatterplot showing the link between infrastructure and overall LPI score over time. the base ggplot has ech point as a country colored by region. The gganimate tells it to move forward using year. It renders the animation as a GIF so it can be included in the HTML markdown.
+
+knitr::include_graphics("C:/Users/12022/Downloads/LPI Mapping.png")
